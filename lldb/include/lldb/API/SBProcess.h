@@ -197,19 +197,6 @@ public:
   ///
   void ForceScriptedState(StateType new_state);
 
-  size_t ReadMemory(addr_t addr, void *buf, size_t size, lldb::SBError &error);
-
-  size_t WriteMemory(addr_t addr, const void *buf, size_t size,
-                     lldb::SBError &error);
-
-  size_t ReadCStringFromMemory(addr_t addr, void *char_buf, size_t size,
-                               lldb::SBError &error);
-
-  uint64_t ReadUnsignedFromMemory(addr_t addr, uint32_t byte_size,
-                                  lldb::SBError &error);
-
-  lldb::addr_t ReadPointerFromMemory(addr_t addr, lldb::SBError &error);
-
   lldb::SBAddressRangeList FindRangesInMemory(const void *buf, uint64_t size,
                                               const SBAddressRangeList &ranges,
                                               uint32_t alignment,

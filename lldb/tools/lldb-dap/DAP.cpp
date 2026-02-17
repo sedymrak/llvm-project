@@ -1555,7 +1555,6 @@ void DAP::RegisterRequests() {
   RegisterRequest<LocationsRequestHandler>();
   RegisterRequest<NextRequestHandler>();
   RegisterRequest<PauseRequestHandler>();
-  RegisterRequest<ReadMemoryRequestHandler>();
   RegisterRequest<RestartRequestHandler>();
   RegisterRequest<ScopesRequestHandler>();
   RegisterRequest<SetBreakpointsRequestHandler>();
@@ -1571,7 +1570,6 @@ void DAP::RegisterRequests() {
   RegisterRequest<StepOutRequestHandler>();
   RegisterRequest<ThreadsRequestHandler>();
   RegisterRequest<VariablesRequestHandler>();
-  RegisterRequest<WriteMemoryRequestHandler>();
 
   // Custom requests
   RegisterRequest<CompileUnitsRequestHandler>();

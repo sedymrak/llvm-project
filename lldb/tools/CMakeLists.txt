@@ -1,6 +1,5 @@
 add_subdirectory(argdumper)
 add_subdirectory(driver)
-add_subdirectory(intel-features)
 
 # We want lldb-test to be built only when it's needed,
 # i.e. if a target requires it as dependency. The typical
