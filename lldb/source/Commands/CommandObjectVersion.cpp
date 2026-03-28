@@ -1,7 +1,7 @@
 //===-- CommandObjectVersion.cpp ------------------------------------------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
+// Súčasť projektu LLVM, pod licenciou Apache License v2.0 s výnimkami LLVM.
+// Informácie o licencii nájdete na https://llvm.org/LICENSE.txt.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
