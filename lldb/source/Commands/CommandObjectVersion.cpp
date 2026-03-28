@@ -30,7 +30,7 @@ CommandObjectVersion::CommandObjectVersion(CommandInterpreter &interpreter)
 
 CommandObjectVersion::~CommandObjectVersion() = default;
 
-// Dump the array values on a single line.
+// Vypíš hodnoty poľa na jeden riadok.
 static void dump(const StructuredData::Array &array, Stream &s) {
   std::vector<std::string> values;
   array.ForEach([&](StructuredData::Object *object) -> bool {
@@ -41,7 +41,7 @@ static void dump(const StructuredData::Array &array, Stream &s) {
   s << '[' << llvm::join(values, ", ") << ']';
 }
 
-// The default dump output is too verbose.
+// Predvolený výstup výpisu je príliš podrobný.
 static void dump(const StructuredData::Dictionary &config, Stream &s) {
   config.ForEach(
       [&](llvm::StringRef key, StructuredData::Object *object) -> bool {
