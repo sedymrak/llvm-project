@@ -150,7 +150,7 @@ void Driver::OptionData::AddInitialCommand(std::string command,
       command_set->push_back(InitialCmdEntry(final_path, is_file));
     } else
       error.SetErrorStringWithFormat(
-          "file specified in --source (-s) option doesn't exist: '%s'",
+          "súbor zadaný vo voľbe --source (-s) neexistuje: '%s'",
           command.c_str());
   } else
     command_set->push_back(InitialCmdEntry(command, is_file));
@@ -225,7 +225,7 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
     SBFileSpec file(arg_value);
     if (!file.Exists()) {
       error.SetErrorStringWithFormat(
-          "file specified in --core (-c) option doesn't exist: '%s'",
+          "súbor zadaný vo voľbe --core (-c) neexistuje: '%s'",
           arg_value);
       return error;
     }
@@ -257,7 +257,7 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
       m_option_data.m_args.emplace_back(path);
     } else {
       error.SetErrorStringWithFormat(
-          "file specified in --file (-f) option doesn't exist: '%s'",
+          "súbor zadaný vo voľbe --file (-f) neexistuje: '%s'",
           arg_value);
       return error;
     }
@@ -267,7 +267,7 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
     auto *arg_value = arg->getValue();
     if (!lldb::SBDebugger::SetDefaultArchitecture(arg_value)) {
       error.SetErrorStringWithFormat(
-          "invalid architecture in the -a or --arch option: '%s'", arg_value);
+          "neplatná architektúra vo voľbe -a alebo --arch: '%s'", arg_value);
       return error;
     }
   }
@@ -289,7 +289,7 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
   if (args.hasArg(OPT_wait_for)) {
     if (!args.hasArg(OPT_attach_name)) {
       error.SetErrorStringWithFormat(
-          "--wait-for requires a name (--attach-name)");
+          "--wait-for vyžaduje meno (--attach-name)");
       return error;
     }
 
@@ -302,7 +302,7 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
     m_option_data.m_process_pid = strtol(arg_value, &remainder, 0);
     if (remainder == arg_value || *remainder != '\0') {
       error.SetErrorStringWithFormat(
-          "Could not convert process PID: \"%s\" into a pid.", arg_value);
+          "Nepodarilo sa previesť PID procesu: \"%s\" na pid.", arg_value);
       return error;
     }
   }
@@ -312,7 +312,7 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
     m_option_data.m_repl_lang =
         SBLanguageRuntime::GetLanguageTypeFromString(arg_value);
     if (m_option_data.m_repl_lang == eLanguageTypeUnknown) {
-      error.SetErrorStringWithFormat("Unrecognized language name: \"%s\"",
+      error.SetErrorStringWithFormat("Nerozpoznaný názov jazyka: \"%s\"",
                                      arg_value);
       return error;
     }
@@ -390,7 +390,7 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
         m_option_data.m_args.emplace_back(value);
     }
   } else if (args.getLastArgNoClaim() != nullptr) {
-    WithColor::warning() << "program arguments are ignored when attaching.\n";
+    WithColor::warning() << "argumenty programu sú ignorované pri pripájaní.\n";
   }
 
   if (m_option_data.m_print_version) {
@@ -408,9 +408,9 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
       if (num_chars < PATH_MAX) {
         llvm::outs() << python_path << '\n';
       } else
-        llvm::outs() << "<PATH TOO LONG>\n";
+        llvm::outs() << "<CESTA PRÍLIŠ DLHÁ>\n";
     } else
-      llvm::outs() << "<COULD NOT FIND PATH>\n";
+      llvm::outs() << "<CESTU SA NEPODARILO NÁJSŤ>\n";
     exiting = true;
     return error;
   }
@@ -419,7 +419,7 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
     SBStructuredData info =
         m_debugger.GetScriptInterpreterInfo(m_debugger.GetScriptLanguage());
     if (!info) {
-      error.SetErrorString("no script interpreter.");
+      error.SetErrorString("žiadny interpret skriptov.");
     } else {
       SBStream stream;
       error = info.GetAsJSON(stream);
@@ -541,8 +541,8 @@ int Driver::MainLoop() {
     WriteCommandsForSourcing(eCommandPlacementAfterFile, commands_stream);
   } else if (!m_option_data.m_after_file_commands.empty()) {
     // We're in repl mode and after-file-load commands were specified.
-    WithColor::warning() << "commands specified to run after file load (via -o "
-                            "or -s) are ignored in REPL mode.\n";
+    WithColor::warning() << "príkazy určené na spustenie po načítaní súboru (cez -o "
+                            "alebo -s) sú ignorované v režime REPL.\n";
   }
 
   const bool handle_events = true;
@@ -675,48 +675,48 @@ void sigint_handler(int signo) {
 }
 
 static void printHelp(LLDBOptTable &table, llvm::StringRef tool_name) {
-  std::string usage_str = tool_name.str() + " [options]";
+  std::string usage_str = tool_name.str() + " [voľby]";
   table.printHelp(llvm::outs(), usage_str.c_str(), "LLDB", false);
 
   std::string examples = R"___(
-EXAMPLES:
-  The debugger can be started in several modes.
+PRÍKLADY:
+  Debugger môže byť spustený v niekoľkých režimoch.
 
-  Passing an executable as a positional argument prepares lldb to debug the
-  given executable. To disambiguate between arguments passed to lldb and
-  arguments passed to the debugged executable, arguments starting with a - must
-  be passed after --.
+  Zadanie spustiteľného súboru ako pozičného argumentu pripraví lldb na ladenie
+  daného spustiteľného súboru. Na rozlíšenie medzi argumentmi odovzdanými lldb
+  a argumentmi odovzdanými ladenému spustiteľnému súboru, argumenty začínajúce
+  s - musia byť zadané po --.
 
     lldb --arch x86_64 /path/to/program program argument -- --arch armv7
 
-  For convenience, passing the executable after -- is also supported.
+  Pre pohodlie je podporené aj zadanie spustiteľného súboru po --.
 
     lldb --arch x86_64 -- /path/to/program program argument --arch armv7
 
-  Passing one of the attach options causes lldb to immediately attach to the
-  given process.
+  Zadanie jednej z volieb pripojenia spôsobí, že lldb sa okamžite pripojí k
+  danému procesu.
 
     lldb -p <pid>
     lldb -n <process-name>
 
-  Passing --repl starts lldb in REPL mode.
+  Zadanie --repl spustí lldb v režime REPL.
 
     lldb -r
 
-  Passing --core causes lldb to debug the core file.
+  Zadanie --core spôsobí, že lldb bude ladiť súbor core.
 
     lldb -c /path/to/core
 
-  Command options can be combined with these modes and cause lldb to run the
-  specified commands before or after events, like loading the file or crashing,
-  in the order provided on the command line.
+  Voľby príkazov môžu byť kombinované s týmito režimami a spôsobia, že lldb
+  spustí zadané príkazy pred alebo po udalostiach, ako je načítanie súboru
+  alebo pád, v poradí zadanom na príkazovom riadku.
 
     lldb -O 'settings set stop-disassembly-count 20' -o 'run' -o 'bt'
     lldb -S /source/before/file -s /source/after/file
     lldb -K /source/before/crash -k /source/after/crash
 
-  Note: In REPL mode no file is loaded, so commands specified to run after
-  loading the file (via -o or -s) will be ignored.)___";
+  Poznámka: V režime REPL nie je načítaný žiadny súbor, takže príkazy určené
+  na spustenie po načítaní súboru (cez -o alebo -s) budú ignorované.)___";
   llvm::outs() << examples << '\n';
 }
 
@@ -729,11 +729,11 @@ int main(int argc, char const *argv[]) {
   // destruction.
   llvm::InitLLVM IL(argc, argv, /*InstallPipeSignalExitHandler=*/false);
 #if !defined(__APPLE__)
-  llvm::setBugReportMsg("PLEASE submit a bug report to " LLDB_BUG_REPORT_URL
-                        " and include the crash backtrace.\n");
+  llvm::setBugReportMsg("PROSÍM odošlite hlásenie o chybe na " LLDB_BUG_REPORT_URL
+                        " a priložte výpis pádu.\n");
 #else
-  llvm::setBugReportMsg("PLEASE submit a bug report to " LLDB_BUG_REPORT_URL
-                        " and include the crash report from "
+  llvm::setBugReportMsg("PROSÍM odošlite hlásenie o chybe na " LLDB_BUG_REPORT_URL
+                        " a priložte hlásenie o páde z "
                         "~/Library/Logs/DiagnosticReports/.\n");
 #endif
 
@@ -760,25 +760,25 @@ int main(int argc, char const *argv[]) {
 
   // Check for missing argument error.
   if (MissingArgCount) {
-    WithColor::error() << "argument to '"
+    WithColor::error() << "chýba argument pre '"
                        << input_args.getArgString(MissingArgIndex)
-                       << "' is missing\n";
+                       << "'\n";
   }
   // Error out on unknown options.
   if (input_args.hasArg(OPT_UNKNOWN)) {
     for (auto *arg : input_args.filtered(OPT_UNKNOWN)) {
-      WithColor::error() << "unknown option: " << arg->getSpelling() << '\n';
+      WithColor::error() << "neznáma voľba: " << arg->getSpelling() << '\n';
     }
   }
   if (MissingArgCount || input_args.hasArg(OPT_UNKNOWN)) {
-    llvm::errs() << "Use '" << argv0
-                 << " --help' for a complete list of options.\n";
+    llvm::errs() << "Použite '" << argv0
+                 << " --help' pre úplný zoznam volieb.\n";
     return 1;
   }
 
   SBError error = SBDebugger::InitializeWithErrorHandling();
   if (error.Fail()) {
-    WithColor::error() << "initialization failed: " << error.GetCString()
+    WithColor::error() << "inicializácia zlyhala: " << error.GetCString()
                        << '\n';
     return 1;
   }
@@ -818,13 +818,13 @@ int main(int argc, char const *argv[]) {
 
         int ret = sigaction(SIGTSTP, &new_action, &old_action);
         UNUSED_IF_ASSERT_DISABLED(ret);
-        assert(ret == 0 && "sigaction failed");
+        assert(ret == 0 && "sigaction zlyhalo");
 
         raise(SIGTSTP);
 
         ret = sigaction(SIGTSTP, &old_action, nullptr);
         UNUSED_IF_ASSERT_DISABLED(ret);
-        assert(ret == 0 && "sigaction failed");
+        assert(ret == 0 && "sigaction zlyhalo");
 
         if (g_driver)
           g_driver->GetDebugger().RestoreInputTerminalState();
@@ -860,7 +860,7 @@ int main(int argc, char const *argv[]) {
         std::async(std::launch::async, []() { SBDebugger::Terminate(); });
 
     if (future.wait_for(std::chrono::seconds(1)) == std::future_status::timeout)
-      fprintf(stderr, "Waiting for background tasks to complete...\n");
+      fprintf(stderr, "Čakám na dokončenie úloh na pozadí...\n");
 
     future.wait();
   }
