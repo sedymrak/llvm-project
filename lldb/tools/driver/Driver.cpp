@@ -67,7 +67,7 @@ namespace {
 using namespace llvm::opt;
 
 enum ID {
-  OPT_INVALID = 0, // This is not an option ID.
+  OPT_INVALID = 0, // Toto nie je ID voľby.
 #define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
 #include "Options.inc"
 #undef OPTION
@@ -102,8 +102,8 @@ static bool disable_color(const raw_ostream &OS) { return false; }
 
 static Driver *g_driver = nullptr;
 
-// In the Driver::MainLoop, we change the terminal settings.  This function is
-// added as an atexit handler to make sure we clean them up.
+// V Driver::MainLoop meníme nastavenia terminálu. Táto funkcia je
+// pridaná ako atexit handler, aby sme ich zaručene vyčistili.
 static void reset_stdin_termios() {
   if (g_old_stdin_termios_is_valid) {
     g_old_stdin_termios_is_valid = false;
@@ -113,8 +113,8 @@ static void reset_stdin_termios() {
 
 Driver::Driver()
     : SBBroadcaster("Driver"), m_debugger(SBDebugger::Create(false)) {
-  // We want to be able to handle CTRL+D in the terminal to have it terminate
-  // certain input
+  // Chceme mať možnosť spracovať CTRL+D v termináli, aby ukončil
+  // určitý vstup
   m_debugger.SetCloseInputOnEOF(false);
   g_driver = this;
 }
@@ -183,20 +183,19 @@ void Driver::WriteCommandsForSourcing(CommandPlacement placement,
   }
 }
 
-// Check the arguments that were passed to this program to make sure they are
-// valid and to get their argument values (if any).  Return a boolean value
-// indicating whether or not to start up the full debugger (i.e. the Command
-// Interpreter) or not.  Return FALSE if the arguments were invalid OR if the
-// user only wanted help or version information.
+// Skontrolujte argumenty odovzdané tomuto programu, aby ste sa uistili, že sú
+// platné, a získajte ich hodnoty (ak nejaké sú). Vráťte booleovskú hodnotu
+// označujúcu, či spustiť plný debugger (t.j. Command Interpreter) alebo nie.
+// Vráťte FALSE, ak boli argumenty neplatné ALEBO ak si používateľ
+// želal iba pomoc alebo informácie o verzii.
 SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
   SBError error;
 
-  // This is kind of a pain, but since we make the debugger in the Driver's
-  // constructor, we can't know at that point whether we should read in init
-  // files yet.  So we don't read them in in the Driver constructor, then set
-  // the flags back to "read them in" here, and then if we see the "-n" flag,
-  // we'll turn it off again.  Finally we have to read them in by hand later in
-  // the main loop.
+  // Je to trochu nepríjemné, ale keďže vytvárame debugger v konštruktore
+  // Driver-a, v tom momente nevieme, či by sme mali načítať init súbory.
+  // Preto ich nenačítame v konštruktore Driver-a, potom tu nastavíme príznaky
+  // späť na "načítať ich" a ak uvidíme príznak "-n", vypneme ho znova.
+  // Nakoniec ich musíme načítať ručne neskôr v hlavnej slučke.
   m_debugger.SkipLLDBInitFiles(false);
   m_debugger.SkipAppInitFiles(false);
 
@@ -329,8 +328,8 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
       m_option_data.m_repl_options = arg_value;
   }
 
-  // We need to process the options below together as their relative order
-  // matters.
+  // Nasledujúce voľby musíme spracovať spoločne, pretože záleží
+  // na ich relatívnom poradí.
   for (auto *arg : args.filtered(OPT_source_on_crash, OPT_one_line_on_crash,
                                  OPT_source, OPT_source_before_file,
                                  OPT_one_line, OPT_one_line_before_file)) {
@@ -384,7 +383,7 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
     for (auto *arg : args.filtered(OPT_INPUT))
       m_option_data.m_args.push_back(arg->getAsString((args)));
 
-    // Any argument following -- is an argument for the inferior.
+    // Každý argument nasledujúci po -- je argumentom pre ladený program.
     if (auto *arg = args.getLastArgNoClaim(OPT_REM)) {
       for (auto *value : arg->getValues())
         m_option_data.m_args.emplace_back(value);
@@ -450,51 +449,51 @@ int Driver::MainLoop() {
   }
 
 #ifndef _MSC_VER
-  // Disabling stdin buffering with MSVC's 2015 CRT exposes a bug in fgets
-  // which causes it to miss newlines depending on whether there have been an
-  // odd or even number of characters.  Bug has been reported to MS via Connect.
+  // Zakázanie buferovania stdin s CRT 2015 od MSVC odhaľuje chybu vo fgets,
+  // ktorá spôsobuje, že preskakuje nové riadky v závislosti od toho, či bol
+  // nepárny alebo párny počet znakov. Chyba bola nahlásená MS cez Connect.
   ::setbuf(stdin, nullptr);
 #endif
   ::setbuf(stdout, nullptr);
 
   m_debugger.SetErrorFileHandle(stderr, false);
   m_debugger.SetOutputFileHandle(stdout, false);
-  // Don't take ownership of STDIN yet...
+  // Zatiaľ nepreberáme vlastníctvo STDIN...
   m_debugger.SetInputFileHandle(stdin, false);
 
   m_debugger.SetUseExternalEditor(m_option_data.m_use_external_editor);
   m_debugger.SetShowInlineDiagnostics(true);
 
-  // Set the terminal dimensions.
+  // Nastavte rozmery terminálu.
   UpdateWindowSize();
 
   SBCommandInterpreter sb_interpreter = m_debugger.GetCommandInterpreter();
 
-  // Process lldbinit files before handling any options from the command line.
+  // Spracujte súbory lldbinit pred spracovaním volieb z príkazového riadku.
   SBCommandReturnObject result;
   sb_interpreter.SourceInitFileInGlobalDirectory(result);
   sb_interpreter.SourceInitFileInHomeDirectory(result, m_option_data.m_repl);
 
-  // Source the local .lldbinit file if it exists and we're allowed to source.
-  // Here we want to always print the return object because it contains the
-  // warning and instructions to load local lldbinit files.
+  // Načítajte lokálny súbor .lldbinit, ak existuje a máme povolenie ho načítať.
+  // Tu chceme vždy vypísať návratový objekt, pretože obsahuje
+  // varovanie a inštrukcie na načítanie lokálnych súborov lldbinit.
   sb_interpreter.SourceInitFileInCurrentWorkingDirectory(result);
   result.PutError(m_debugger.GetErrorFile());
   result.PutOutput(m_debugger.GetOutputFile());
 
-  // We allow the user to specify an exit code when calling quit which we will
-  // return when exiting.
+  // Umožňujeme používateľovi určiť návratový kód pri volaní quit, ktorý
+  // vrátime pri ukončení.
   m_debugger.GetCommandInterpreter().AllowExitCodeOnQuit(true);
 
-  // Now we handle options we got from the command line
+  // Teraz spracujeme voľby získané z príkazového riadku
   SBStream commands_stream;
 
-  // First source in the commands specified to be run before the file arguments
-  // are processed.
+  // Najprv načítame príkazy určené na spustenie pred spracovaním
+  // argumentov súboru.
   WriteCommandsForSourcing(eCommandPlacementBeforeFile, commands_stream);
 
-  // If we're not in --repl mode, add the commands to process the file
-  // arguments, and the commands specified to run afterwards.
+  // Ak nie sme v režime --repl, pridáme príkazy na spracovanie argumentov
+  // súboru a príkazy určené na spustenie potom.
   if (!m_option_data.m_repl) {
     const size_t num_args = m_option_data.m_args.size();
     if (num_args > 0) {
@@ -540,7 +539,7 @@ int Driver::MainLoop() {
 
     WriteCommandsForSourcing(eCommandPlacementAfterFile, commands_stream);
   } else if (!m_option_data.m_after_file_commands.empty()) {
-    // We're in repl mode and after-file-load commands were specified.
+    // Sme v režime repl a boli zadané príkazy po načítaní súboru.
     WithColor::warning() << "commands specified to run after file load (via -o "
                             "or -s) are ignored in REPL mode.\n";
   }
@@ -548,9 +547,9 @@ int Driver::MainLoop() {
   const bool handle_events = true;
   const bool spawn_thread = false;
 
-  // Check if we have any data in the commands stream, and if so, save it to a
-  // temp file
-  // so we can then run the command interpreter using the file contents.
+  // Skontrolujte, či máme nejaké dáta v prúde príkazov, a ak áno, uložte ich
+  // do dočasného súboru, aby sme potom mohli spustiť interpret príkazov
+  // s obsahom súboru.
   bool go_interactive = !m_option_data.m_batch;
   if ((commands_stream.GetData() != nullptr) &&
       (commands_stream.GetSize() != 0u)) {
@@ -560,8 +559,8 @@ int Driver::MainLoop() {
       return 1;
     }
 
-    // Set the debugger into Sync mode when running the command file. Otherwise
-    // command files that run the target won't run in a sensible way.
+    // Nastavte debugger do Sync režimu pri spúšťaní súboru príkazov. Inak
+    // súbory príkazov, ktoré spúšťajú cieľ, nebudú fungovať rozumne.
     bool old_async = m_debugger.GetAsync();
     m_debugger.SetAsync(false);
 
@@ -580,8 +579,8 @@ int Driver::MainLoop() {
         results.GetResult() != lldb::eCommandInterpreterResultInferiorCrash)
       go_interactive = false;
 
-    // When running in batch mode and stopped because of an error, exit with a
-    // non-zero exit status.
+    // Pri spúšťaní v dávkovom režime a zastavení z dôvodu chyby ukončíme
+    // s nenulovým návratovým kódom.
     if (m_option_data.m_batch &&
         results.GetResult() == lldb::eCommandInterpreterResultCommandError)
       return 1;
@@ -602,8 +601,8 @@ int Driver::MainLoop() {
             lldb::eCommandInterpreterResultQuitRequested)
           go_interactive = false;
 
-        // When running in batch mode and an error occurred while sourcing
-        // the crash commands, exit with a non-zero exit status.
+        // Pri spúšťaní v dávkovom režime a výskyte chyby počas načítavania
+        // crash príkazov ukončíme s nenulovým návratovým kódom.
         if (m_option_data.m_batch &&
             local_results.GetResult() ==
                 lldb::eCommandInterpreterResultCommandError)
@@ -613,9 +612,9 @@ int Driver::MainLoop() {
     m_debugger.SetAsync(old_async);
   }
 
-  // Now set the input file handle to STDIN and run the command interpreter
-  // again in interactive mode or repl mode and let the debugger take ownership
-  // of stdin.
+  // Teraz nastavíme vstupný súborový deskriptor na STDIN a spustíme
+  // interpret príkazov znova v interaktívnom alebo repl režime a necháme
+  // debugger prevziať vlastníctvo stdin.
   if (go_interactive) {
     m_debugger.SetInputFileHandle(stdin, true);
 
@@ -658,7 +657,7 @@ void Driver::UpdateWindowSize() {
 
 void sigint_handler(int signo) {
 #ifdef _WIN32
-  // Restore handler as it is not persistent on Windows.
+  // Obnovte handler, pretože nie je trvalý na Windows.
   signal(SIGINT, sigint_handler);
 #endif
 
@@ -721,12 +720,12 @@ EXAMPLES:
 }
 
 int main(int argc, char const *argv[]) {
-  // Editline uses for example iswprint which is dependent on LC_CTYPE.
+  // Editline používa napríklad iswprint, ktorý závisí od LC_CTYPE.
   std::setlocale(LC_ALL, "");
   std::setlocale(LC_CTYPE, "");
 
-  // Setup LLVM signal handlers and make sure we call llvm_shutdown() on
-  // destruction.
+  // Nastavte handlery signálov LLVM a uistite sa, že pri deštrukcii
+  // zavoláme llvm_shutdown().
   llvm::InitLLVM IL(argc, argv, /*InstallPipeSignalExitHandler=*/false);
 #if !defined(__APPLE__)
   llvm::setBugReportMsg("PLEASE submit a bug report to " LLDB_BUG_REPORT_URL
@@ -744,7 +743,7 @@ int main(int argc, char const *argv[]) {
         << llvm::toString(python_path_or_err.takeError()) << '\n';
 #endif
 
-  // Parse arguments.
+  // Analyzujte argumenty.
   LLDBOptTable T;
   unsigned MissingArgIndex;
   unsigned MissingArgCount;
@@ -758,13 +757,13 @@ int main(int argc, char const *argv[]) {
     return 0;
   }
 
-  // Check for missing argument error.
+  // Skontrolujte chybu chýbajúceho argumentu.
   if (MissingArgCount) {
     WithColor::error() << "argument to '"
                        << input_args.getArgString(MissingArgIndex)
                        << "' is missing\n";
   }
-  // Error out on unknown options.
+  // Ohláste chybu pri neznámych voľbách.
   if (input_args.hasArg(OPT_UNKNOWN)) {
     for (auto *arg : input_args.filtered(OPT_UNKNOWN)) {
       WithColor::error() << "unknown option: " << arg->getSpelling() << '\n';
@@ -783,15 +782,15 @@ int main(int argc, char const *argv[]) {
     return 1;
   }
 
-  // Setup LLDB signal handlers once the debugger has been initialized.
+  // Nastavte handlery signálov LLDB po inicializácii debuggera.
   SBDebugger::PrintDiagnosticsOnError();
 
-  //  FIXME: Migrate the SIGINT handler to be handled by the signal loop below.
+  //  FIXME: Presunúť handler SIGINT na spracovanie slučkou signálov nižšie.
   signal(SIGINT, sigint_handler);
 #if !defined(_WIN32)
   signal(SIGPIPE, SIG_IGN);
 
-  // Handle signals in a MainLoop running on a separate thread.
+  // Spracujte signály v MainLoop bežiacom na samostatnom vlákne.
   MainLoop signal_loop;
   Status signal_status;
 
@@ -836,8 +835,8 @@ int main(int argc, char const *argv[]) {
 #endif
 
   int exit_code = 0;
-  // Create a scope for driver so that the driver object will destroy itself
-  // before SBDebugger::Terminate() is called.
+  // Vytvorte scope pre driver, aby sa objekt driver zničil
+  // pred volaním SBDebugger::Terminate().
   {
     Driver driver;
 
@@ -852,9 +851,9 @@ int main(int argc, char const *argv[]) {
     }
   }
 
-  // When terminating the debugger we have to wait on all the background tasks
-  // to complete, which can take a while. Print a message when this takes longer
-  // than 1 second.
+  // Pri ukončovaní debuggera musíme čakať na dokončenie všetkých úloh na
+  // pozadí, čo môže chvíľu trvať. Vypíšte správu, ak to trvá dlhšie
+  // ako 1 sekunda.
   {
     std::future<void> future =
         std::async(std::launch::async, []() { SBDebugger::Terminate(); });
@@ -866,7 +865,7 @@ int main(int argc, char const *argv[]) {
   }
 
 #if !defined(_WIN32)
-  // Try to interrupt the signal thread.  If that succeeds, wait for it to exit.
+  // Pokúste sa prerušiť vlákno signálov. Ak to uspeje, počkajte na jeho ukončenie.
   if (signal_loop.AddPendingCallback(
           [](MainLoopBase &loop) { loop.RequestTermination(); }))
     signal_thread.join();
