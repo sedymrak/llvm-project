@@ -77,8 +77,8 @@ bool UnwindLLDB::AddFirstFrame() {
 
   // First, set up the 0th (initial) frame
   CursorSP first_cursor_sp(new Cursor());
-  RegisterContextUnwindSP reg_ctx_sp(new RegisterContextUnwind(
-      m_thread, RegisterContextUnwindSP(), first_cursor_sp->sctx, 0, *this));
+  RegisterContextUnwindSP reg_ctx_sp = std::make_shared<RegisterContextUnwind>(
+      m_thread, RegisterContextUnwindSP(), first_cursor_sp->sctx, 0, *this);
   if (reg_ctx_sp.get() == nullptr)
     goto unwind_done;
 
