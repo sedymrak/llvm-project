@@ -92,13 +92,13 @@ protected:
   lldb::RegisterContextSP
   DoCreateRegisterContextForFrame(lldb_private::StackFrame *frame) override;
 
-  typedef std::shared_ptr<RegisterContextUnwind> RegisterContextLLDBSP;
+  typedef std::shared_ptr<RegisterContextUnwind> RegisterContextUnwindSP;
 
   // Needed to retrieve the "next" frame (e.g. frame 2 needs to retrieve frame
   // 1's RegisterContextUnwind)
   // The RegisterContext for frame_num must already exist or this returns an
   // empty shared pointer.
-  RegisterContextLLDBSP GetRegisterContextForFrameNum(uint32_t frame_num);
+  RegisterContextUnwindSP GetRegisterContextForFrameNum(uint32_t frame_num);
 
   // Iterate over the RegisterContextUnwind's in our m_frames vector, look for
   // the first one that has a saved location for this reg.
@@ -130,7 +130,7 @@ private:
                                              // this stack frame
     lldb_private::SymbolContext sctx; // A symbol context we'll contribute to &
                                       // provide to the StackFrame creation
-    RegisterContextLLDBSP
+    RegisterContextUnwindSP
         reg_ctx_lldb_sp; // These are all RegisterContextUnwind's
 
     Cursor() = default;

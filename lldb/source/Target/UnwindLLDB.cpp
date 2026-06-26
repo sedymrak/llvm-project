@@ -77,8 +77,8 @@ bool UnwindLLDB::AddFirstFrame() {
 
   // First, set up the 0th (initial) frame
   CursorSP first_cursor_sp(new Cursor());
-  RegisterContextLLDBSP reg_ctx_sp(new RegisterContextUnwind(
-      m_thread, RegisterContextLLDBSP(), first_cursor_sp->sctx, 0, *this));
+  RegisterContextUnwindSP reg_ctx_sp(new RegisterContextUnwind(
+      m_thread, RegisterContextUnwindSP(), first_cursor_sp->sctx, 0, *this));
   if (reg_ctx_sp.get() == nullptr)
     goto unwind_done;
 
@@ -124,7 +124,7 @@ UnwindLLDB::CursorSP UnwindLLDB::GetOneMoreFrame(ABI *abi) {
   uint32_t cur_idx = m_frames.size();
 
   CursorSP cursor_sp(new Cursor());
-  RegisterContextLLDBSP reg_ctx_sp(new RegisterContextUnwind(
+  RegisterContextUnwindSP reg_ctx_sp(new RegisterContextUnwind(
       m_thread, prev_frame->reg_ctx_lldb_sp, cursor_sp->sctx, cur_idx, *this));
 
   uint64_t max_stack_depth = m_thread.GetMaxBacktraceDepth();
@@ -463,9 +463,9 @@ UnwindLLDB::DoCreateRegisterContextForFrame(StackFrame *frame) {
   return reg_ctx_sp;
 }
 
-UnwindLLDB::RegisterContextLLDBSP
+UnwindLLDB::RegisterContextUnwindSP
 UnwindLLDB::GetRegisterContextForFrameNum(uint32_t frame_num) {
-  RegisterContextLLDBSP reg_ctx_sp;
+  RegisterContextUnwindSP reg_ctx_sp;
   if (frame_num < m_frames.size())
     reg_ctx_sp = m_frames[frame_num]->reg_ctx_lldb_sp;
   return reg_ctx_sp;
