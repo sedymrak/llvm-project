@@ -93,7 +93,7 @@ bool UnwindLLDB::AddFirstFrame() {
 
   // Everything checks out, so release the auto pointer value and let the
   // cursor own it in its shared pointer
-  first_cursor_sp->reg_ctx_lldb_sp = reg_ctx_sp;
+  first_cursor_sp->reg_ctx_unwind_sp = reg_ctx_sp;
   m_frames.push_back(first_cursor_sp);
 
   // Update the Full Unwind Plan for this frame if not valid
@@ -125,7 +125,7 @@ UnwindLLDB::CursorSP UnwindLLDB::GetOneMoreFrame(ABI *abi) {
 
   CursorSP cursor_sp(new Cursor());
   RegisterContextUnwindSP reg_ctx_sp(new RegisterContextUnwind(
-      m_thread, prev_frame->reg_ctx_lldb_sp, cursor_sp->sctx, cur_idx, *this));
+      m_thread, prev_frame->reg_ctx_unwind_sp, cursor_sp->sctx, cur_idx, *this));
 
   uint64_t max_stack_depth = m_thread.GetMaxBacktraceDepth();
 
@@ -149,11 +149,11 @@ UnwindLLDB::CursorSP UnwindLLDB::GetOneMoreFrame(ABI *abi) {
     // If the RegisterContextUnwind has a fallback UnwindPlan, it will switch to
     // that and return true.  Subsequent calls to TryFallbackUnwindPlan() will
     // return false.
-    if (prev_frame->reg_ctx_lldb_sp->TryFallbackUnwindPlan()) {
+    if (prev_frame->reg_ctx_unwind_sp->TryFallbackUnwindPlan()) {
       // TryFallbackUnwindPlan for prev_frame succeeded and updated
       // reg_ctx_lldb_sp field of prev_frame. However, cfa field of prev_frame
       // still needs to be updated. Hence updating it.
-      if (!(prev_frame->reg_ctx_lldb_sp->GetCFA(prev_frame->cfa)))
+      if (!(prev_frame->reg_ctx_unwind_sp->GetCFA(prev_frame->cfa)))
         return nullptr;
 
       return GetOneMoreFrame(abi);
@@ -168,11 +168,11 @@ UnwindLLDB::CursorSP UnwindLLDB::GetOneMoreFrame(ABI *abi) {
     // We failed to get a valid RegisterContext. See if the regctx below this
     // on the stack has a fallback unwind plan it can use. Subsequent calls to
     // TryFallbackUnwindPlan() will return false.
-    if (prev_frame->reg_ctx_lldb_sp->TryFallbackUnwindPlan()) {
+    if (prev_frame->reg_ctx_unwind_sp->TryFallbackUnwindPlan()) {
       // TryFallbackUnwindPlan for prev_frame succeeded and updated
       // reg_ctx_lldb_sp field of prev_frame. However, cfa field of prev_frame
       // still needs to be updated. Hence updating it.
-      if (!(prev_frame->reg_ctx_lldb_sp->GetCFA(prev_frame->cfa)))
+      if (!(prev_frame->reg_ctx_unwind_sp->GetCFA(prev_frame->cfa)))
         return nullptr;
 
       return GetOneMoreFrame(abi);
@@ -188,11 +188,11 @@ UnwindLLDB::CursorSP UnwindLLDB::GetOneMoreFrame(ABI *abi) {
     // If the RegisterContextUnwind has a fallback UnwindPlan, it will switch to
     // that and return true.  Subsequent calls to TryFallbackUnwindPlan() will
     // return false.
-    if (prev_frame->reg_ctx_lldb_sp->TryFallbackUnwindPlan()) {
+    if (prev_frame->reg_ctx_unwind_sp->TryFallbackUnwindPlan()) {
       // TryFallbackUnwindPlan for prev_frame succeeded and updated
       // reg_ctx_lldb_sp field of prev_frame. However, cfa field of prev_frame
       // still needs to be updated. Hence updating it.
-      if (!(prev_frame->reg_ctx_lldb_sp->GetCFA(prev_frame->cfa)))
+      if (!(prev_frame->reg_ctx_unwind_sp->GetCFA(prev_frame->cfa)))
         return nullptr;
 
       return GetOneMoreFrame(abi);
@@ -216,11 +216,11 @@ UnwindLLDB::CursorSP UnwindLLDB::GetOneMoreFrame(ABI *abi) {
       if (!reg_ctx_sp->TryFallbackUnwindPlan() ||
           !reg_ctx_sp->GetCFA(cursor_sp->cfa) ||
           !abi->CallFrameAddressIsValid(cursor_sp->cfa)) {
-        if (prev_frame->reg_ctx_lldb_sp->TryFallbackUnwindPlan()) {
+        if (prev_frame->reg_ctx_unwind_sp->TryFallbackUnwindPlan()) {
           // TryFallbackUnwindPlan for prev_frame succeeded and updated
           // reg_ctx_lldb_sp field of prev_frame. However, cfa field of
           // prev_frame still needs to be updated. Hence updating it.
-          if (!(prev_frame->reg_ctx_lldb_sp->GetCFA(prev_frame->cfa)))
+          if (!(prev_frame->reg_ctx_unwind_sp->GetCFA(prev_frame->cfa)))
             return nullptr;
 
           return GetOneMoreFrame(abi);
@@ -244,11 +244,11 @@ UnwindLLDB::CursorSP UnwindLLDB::GetOneMoreFrame(ABI *abi) {
     // If the RegisterContextUnwind has a fallback UnwindPlan, it will switch to
     // that and return true.  Subsequent calls to TryFallbackUnwindPlan() will
     // return false.
-    if (prev_frame->reg_ctx_lldb_sp->TryFallbackUnwindPlan()) {
+    if (prev_frame->reg_ctx_unwind_sp->TryFallbackUnwindPlan()) {
       // TryFallbackUnwindPlan for prev_frame succeeded and updated
       // reg_ctx_lldb_sp field of prev_frame. However, cfa field of prev_frame
       // still needs to be updated. Hence updating it.
-      if (!(prev_frame->reg_ctx_lldb_sp->GetCFA(prev_frame->cfa)))
+      if (!(prev_frame->reg_ctx_unwind_sp->GetCFA(prev_frame->cfa)))
         return nullptr;
 
       return GetOneMoreFrame(abi);
@@ -264,15 +264,15 @@ UnwindLLDB::CursorSP UnwindLLDB::GetOneMoreFrame(ABI *abi) {
   // directly below a trap handler frame (in this case, the invalid address is
   // likely the cause of the trap).
   if (abi && !abi->CodeAddressIsValid(cursor_sp->start_pc) &&
-      !prev_frame->reg_ctx_lldb_sp->IsTrapHandlerFrame()) {
+      !prev_frame->reg_ctx_unwind_sp->IsTrapHandlerFrame()) {
     // If the RegisterContextUnwind has a fallback UnwindPlan, it will switch to
     // that and return true.  Subsequent calls to TryFallbackUnwindPlan() will
     // return false.
-    if (prev_frame->reg_ctx_lldb_sp->TryFallbackUnwindPlan()) {
+    if (prev_frame->reg_ctx_unwind_sp->TryFallbackUnwindPlan()) {
       // TryFallbackUnwindPlan for prev_frame succeeded and updated
       // reg_ctx_lldb_sp field of prev_frame. However, cfa field of prev_frame
       // still needs to be updated. Hence updating it.
-      if (!(prev_frame->reg_ctx_lldb_sp->GetCFA(prev_frame->cfa)))
+      if (!(prev_frame->reg_ctx_unwind_sp->GetCFA(prev_frame->cfa)))
         return nullptr;
 
       return GetOneMoreFrame(abi);
@@ -292,7 +292,7 @@ UnwindLLDB::CursorSP UnwindLLDB::GetOneMoreFrame(ABI *abi) {
     return nullptr;
   }
 
-  cursor_sp->reg_ctx_lldb_sp = reg_ctx_sp;
+  cursor_sp->reg_ctx_unwind_sp = reg_ctx_sp;
   return cursor_sp;
 }
 
@@ -352,7 +352,7 @@ bool UnwindLLDB::AddOneMoreFrame(ABI *abi) {
   // We can't go further from the frame returned by GetOneMore frame. Lets try
   // to get a different frame with using the fallback unwind plan.
   if (!m_frames[m_frames.size() - 2]
-           ->reg_ctx_lldb_sp->TryFallbackUnwindPlan()) {
+           ->reg_ctx_unwind_sp->TryFallbackUnwindPlan()) {
     // We don't have a valid fallback unwind plan. Accept the frame as it is.
     // This is a valid situation when we are at the bottom of the stack.
     return true;
@@ -381,7 +381,7 @@ bool UnwindLLDB::AddOneMoreFrame(ABI *abi) {
     // Cursor::m_frames[m_frames.size() - 2], reg_ctx_lldb_sp field was already
     // updated during TryFallbackUnwindPlan call above. However, cfa field
     // still needs to be updated. Hence updating it here and then returning.
-    return m_frames[m_frames.size() - 2]->reg_ctx_lldb_sp->GetCFA(
+    return m_frames[m_frames.size() - 2]->reg_ctx_unwind_sp->GetCFA(
         m_frames[m_frames.size() - 2]->cfa);
   }
 
@@ -411,19 +411,19 @@ bool UnwindLLDB::DoGetFrameInfoAtIndex(uint32_t idx, addr_t &cfa, addr_t &pc,
     if (idx == 0) {
       // Frame zero always behaves like it.
       behaves_like_zeroth_frame = true;
-    } else if (m_frames[idx - 1]->reg_ctx_lldb_sp->IsTrapHandlerFrame()) {
+    } else if (m_frames[idx - 1]->reg_ctx_unwind_sp->IsTrapHandlerFrame()) {
       // This could be an asynchronous signal, thus the
       // pc might point to the interrupted instruction rather
       // than a post-call instruction
       behaves_like_zeroth_frame = true;
-    } else if (m_frames[idx]->reg_ctx_lldb_sp->IsTrapHandlerFrame()) {
+    } else if (m_frames[idx]->reg_ctx_unwind_sp->IsTrapHandlerFrame()) {
       // This frame may result from signal processing installing
       // a pointer to the first byte of a signal-return trampoline
       // in the return address slot of the frame below, so this
       // too behaves like the zeroth frame (i.e. the pc might not
       // be pointing just past a call in it)
       behaves_like_zeroth_frame = true;
-    } else if (m_frames[idx]->reg_ctx_lldb_sp->BehavesLikeZerothFrame()) {
+    } else if (m_frames[idx]->reg_ctx_unwind_sp->BehavesLikeZerothFrame()) {
       behaves_like_zeroth_frame = true;
     } else {
       behaves_like_zeroth_frame = false;
@@ -458,7 +458,7 @@ UnwindLLDB::DoCreateRegisterContextForFrame(StackFrame *frame) {
   const uint32_t num_frames = m_frames.size();
   if (idx < num_frames) {
     Cursor *frame_cursor = m_frames[idx].get();
-    reg_ctx_sp = frame_cursor->reg_ctx_lldb_sp;
+    reg_ctx_sp = frame_cursor->reg_ctx_unwind_sp;
   }
   return reg_ctx_sp;
 }
@@ -467,7 +467,7 @@ UnwindLLDB::RegisterContextUnwindSP
 UnwindLLDB::GetRegisterContextForFrameNum(uint32_t frame_num) {
   RegisterContextUnwindSP reg_ctx_sp;
   if (frame_num < m_frames.size())
-    reg_ctx_sp = m_frames[frame_num]->reg_ctx_lldb_sp;
+    reg_ctx_sp = m_frames[frame_num]->reg_ctx_unwind_sp;
   return reg_ctx_sp;
 }
 
@@ -484,13 +484,13 @@ bool UnwindLLDB::SearchForSavedLocationForRegister(
   // the stack will have a useful value.
   if (pc_reg) {
     UnwindLLDB::RegisterSearchResult result;
-    result = m_frames[frame_num]->reg_ctx_lldb_sp->SavedLocationForRegister(
+    result = m_frames[frame_num]->reg_ctx_unwind_sp->SavedLocationForRegister(
         lldb_regnum, regloc);
     return result == UnwindLLDB::RegisterSearchResult::eRegisterFound;
   }
   while (frame_num >= 0) {
     UnwindLLDB::RegisterSearchResult result;
-    result = m_frames[frame_num]->reg_ctx_lldb_sp->SavedLocationForRegister(
+    result = m_frames[frame_num]->reg_ctx_unwind_sp->SavedLocationForRegister(
         lldb_regnum, regloc);
 
     // We descended down to the live register context aka stack frame 0 and are

@@ -131,7 +131,7 @@ private:
     lldb_private::SymbolContext sctx; // A symbol context we'll contribute to &
                                       // provide to the StackFrame creation
     RegisterContextUnwindSP
-        reg_ctx_lldb_sp; // These are all RegisterContextUnwind's
+        reg_ctx_unwind_sp; // These are all RegisterContextUnwind's
 
     Cursor() = default;
 
