@@ -124,8 +124,8 @@ UnwindLLDB::CursorSP UnwindLLDB::GetOneMoreFrame(ABI *abi) {
   uint32_t cur_idx = m_frames.size();
 
   CursorSP cursor_sp(new Cursor());
-  RegisterContextUnwindSP reg_ctx_sp(new RegisterContextUnwind(
-      m_thread, prev_frame->reg_ctx_unwind_sp, cursor_sp->sctx, cur_idx, *this));
+  RegisterContextUnwindSP reg_ctx_sp = std::make_shared<RegisterContextUnwind>(
+      m_thread, prev_frame->reg_ctx_unwind_sp, cursor_sp->sctx, cur_idx, *this);
 
   uint64_t max_stack_depth = m_thread.GetMaxBacktraceDepth();
 
