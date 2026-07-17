@@ -35,6 +35,7 @@
 
 #include <memory>
 #include <sstream>
+#include <iostream>
 
 #include "llvm/Support/Errno.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -241,9 +242,11 @@ size_t ConnectionFileDescriptor::Read(void *dst, size_t dst_len,
                                       ConnectionStatus &status,
                                       Status *error_ptr) {
   Log *log = GetLog(LLDBLog::Connection);
+  std::cerr << "DEBUG/ConnectionFileDescriptor/Read/0/dst_len = " << dst_len << std::endl;
 
   std::unique_lock<std::recursive_mutex> locker(m_mutex, std::defer_lock);
   if (!locker.try_lock()) {
+    std::cerr << "DEBUG/ConnectionFileDescriptor/Read/1" << std::endl;
     LLDB_LOGF(log,
               "%p ConnectionFileDescriptor::Read () failed to get the "
               "connection lock.",
@@ -255,6 +258,7 @@ size_t ConnectionFileDescriptor::Read(void *dst, size_t dst_len,
     status = eConnectionStatusTimedOut;
     return 0;
   }
+  std::cerr << "DEBUG/ConnectionFileDescriptor/Read/2" << std::endl;
 
   if (m_shutting_down) {
     if (error_ptr)
@@ -263,13 +267,17 @@ size_t ConnectionFileDescriptor::Read(void *dst, size_t dst_len,
     return 0;
   }
 
+  std::cerr << "DEBUG/ConnectionFileDescriptor/Read/3" << std::endl;
   status = BytesAvailable(timeout, error_ptr);
+  std::cerr << "DEBUG/ConnectionFileDescriptor/Read/4/status = " << status << std::endl;
   if (status != eConnectionStatusSuccess)
     return 0;
 
   Status error;
   size_t bytes_read = dst_len;
+  std::cerr << "DEBUG/ConnectionFileDescriptor/Read/5" << std::endl;
   error = m_io_sp->Read(dst, bytes_read);
+  std::cerr << "DEBUG/ConnectionFileDescriptor/Read/6" << std::endl;
 
   LLDB_LOG(log,
            "{0} ConnectionFileDescriptor::Read()  fd = {1}"
@@ -458,8 +466,10 @@ ConnectionFileDescriptor::BytesAvailable(const Timeout<std::micro> &timeout,
       select_helper.FDSetRead(pipe_fd);
 
     while (handle == m_io_sp->GetWaitableHandle()) {
+      std::cerr << "DEBUG/ConnectionFileDescriptor/BytesAvailable/7" << std::endl;
 
       Status error = select_helper.Select();
+      std::cerr << "DEBUG/ConnectionFileDescriptor/BytesAvailable/8" << std::endl;
 
       if (error_ptr)
         *error_ptr = error.Clone();

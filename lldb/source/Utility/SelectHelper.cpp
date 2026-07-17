@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <chrono>
 #include <optional>
+#include <iostream>
 
 #include <cerrno>
 #if defined(_WIN32)
@@ -212,8 +213,10 @@ lldb_private::Status SelectHelper::Select() {
         tv.tv_usec = 0;
       }
     }
+    std::cerr << "DEBUG/SelectHelper/Select/9" << std::endl;
     const int num_set_fds = ::select(nfds, read_fdset_ptr, write_fdset_ptr,
                                      error_fdset_ptr, tv_ptr);
+    std::cerr << "DEBUG/SelectHelper/Select/10" << std::endl;
     if (num_set_fds < 0) {
       // We got an error
       error = lldb_private::Status::FromErrno();

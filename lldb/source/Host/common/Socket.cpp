@@ -22,9 +22,13 @@
 #include "llvm/Support/Errno.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Regex.h"
+#include "llvm/Support/Signals.h"
 #include "llvm/Support/WindowsError.h"
 
 #include "lldb/Host/DomainSocket.h"
+
+#include <string>
+#include <iostream>
 
 #if LLDB_ENABLE_POSIX
 #include <arpa/inet.h>
@@ -174,6 +178,7 @@ Socket::Socket(SocketProtocol protocol, bool should_close)
 Socket::~Socket() { Close(); }
 
 llvm::Error Socket::Initialize() {
+  std::cerr << "DEBUG/Socket/Initialize/0" << std::endl;
 #if defined(_WIN32)
   auto wVersion = WINSOCK_VERSION;
   WSADATA wsaData;
@@ -192,6 +197,7 @@ llvm::Error Socket::Initialize() {
 }
 
 void Socket::Terminate() {
+  std::cerr << "DEBUG/Socket/Terminate/0" << std::endl;
 #if defined(_WIN32)
   ::WSACleanup();
 #endif
@@ -199,6 +205,7 @@ void Socket::Terminate() {
 
 std::unique_ptr<Socket> Socket::Create(const SocketProtocol protocol,
                                        Status &error) {
+  std::cerr << "DEBUG/Socket/Create/0" << std::endl;
   error.Clear();
 
   const bool should_close = true;
@@ -326,10 +333,14 @@ IOObject::WaitableHandle Socket::GetWaitableHandle() {
 }
 
 Status Socket::Read(void *buf, size_t &num_bytes) {
+  Log *log = GetLog(LLDBLog::Communication);
+  std::cerr << "DEBUG/Socket/Read/0" << std::endl;
+  //llvm::sys::PrintStackTrace(llvm::errs());
   Status error;
   int bytes_received = 0;
   do {
     bytes_received = ::recv(m_socket, static_cast<char *>(buf), num_bytes, 0);
+    std::cerr << "DEBUG/Socket/Read/1/bytes_received = " << bytes_received << std::endl;
   } while (bytes_received < 0 && IsInterrupted());
 
   if (bytes_received < 0) {
@@ -338,7 +349,9 @@ Status Socket::Read(void *buf, size_t &num_bytes) {
   } else
     num_bytes = bytes_received;
 
-  LLDB_LOGF(GetLog(LLDBLog::Communication),
+  std::cerr << "DEBUG/Socket/Read/2/num_bytes = " << num_bytes << ", buf = " << std::string((char*)buf, num_bytes) << std::endl;
+
+  LLDB_LOGF(log,
             "%p Socket::Read() (socket = %" PRIu64
             ", src = %p, src_len = %" PRIu64 ", flags = 0) => %" PRIi64
             " (error = %s)",
@@ -350,12 +363,17 @@ Status Socket::Read(void *buf, size_t &num_bytes) {
 }
 
 Status Socket::Write(const void *buf, size_t &num_bytes) {
+  std::cerr << "DEBUG/Socket/Write/0/num_bytes = " << num_bytes << ", buf = " << std::string((const char*)buf, num_bytes) << std::endl;
   const size_t src_len = num_bytes;
   Status error;
   int bytes_sent = 0;
   do {
+    std::cerr << "DEBUG/Socket/Write/1/num_bytes = " << num_bytes << std::endl;
     bytes_sent = Send(buf, num_bytes);
+    std::cerr << "DEBUG/Socket/Write/2/bytes_sent = " << bytes_sent << std::endl;
   } while (bytes_sent < 0 && IsInterrupted());
+  std::cerr << "DEBUG/Socket/Write/3" << std::endl;
+  //llvm::sys::PrintStackTrace(llvm::errs());
 
   if (bytes_sent < 0) {
     SetLastError(error);
@@ -411,6 +429,7 @@ int Socket::SetOption(NativeSocket sockfd, int level, int option_name,
 }
 
 ssize_t Socket::Send(const void *buf, const size_t num_bytes) {
+  std::cerr << "DEBUG/Socket/Send/0/num_bytes = " << num_bytes << std::endl;
   int flags = 0;
 #if defined(MSG_NOSIGNAL)
   flags |= MSG_NOSIGNAL;
