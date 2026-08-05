@@ -96,6 +96,7 @@ void symbolizeAddresses(AddressSet &Addresses,
 LLVM_ABI void RunSignalHandlers();
 
 using SignalHandlerCallback = void (*)(void *);
+using SignalHandler = void (*)();
 
 /// Add a function to be called when an abort/kill signal is delivered to the
 /// process. The handler can have a cookie passed to it to identify what
@@ -115,7 +116,7 @@ LLVM_ABI void AddSignalHandler(SignalHandlerCallback FnPtr, void *Cookie,
 /// functions.  An null interrupt function pointer disables the current
 /// installed function.  Note also that the handler may be executed on a
 /// different thread on some platforms.
-LLVM_ABI void SetInterruptFunction(void (*IF)());
+LLVM_ABI void SetInterruptFunction(SignalHandler IF);
 
 /// Registers a function to be called when an "info" signal is delivered to
 /// the process.
@@ -127,7 +128,7 @@ LLVM_ABI void SetInterruptFunction(void (*IF)());
 /// functions.  An null function pointer disables the current installed
 /// function.  Note also that the handler may be executed on a different
 /// thread on some platforms.
-LLVM_ABI void SetInfoSignalFunction(void (*Handler)());
+LLVM_ABI void SetInfoSignalFunction(SignalHandler Handler);
 
 /// Registers a function to be called in a "one-shot" manner when a pipe
 /// signal is delivered to the process (i.e., on a failed write to a pipe).
@@ -143,7 +144,7 @@ LLVM_ABI void SetInfoSignalFunction(void (*Handler)());
 /// functions.  A null handler pointer disables the current installed
 /// function.  Note also that the handler may be executed on a
 /// different thread on some platforms.
-LLVM_ABI void SetOneShotPipeSignalFunction(void (*Handler)());
+LLVM_ABI void SetOneShotPipeSignalFunction(SignalHandler Handler);
 
 /// On Unix systems and Windows, this function exits with an "IO error" exit
 /// code.

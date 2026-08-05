@@ -534,17 +534,17 @@ void sys::RunInterruptHandlers() {
   RemoveFilesToRemove();
 }
 
-void llvm::sys::SetInterruptFunction(void (*IF)()) {
+void llvm::sys::SetInterruptFunction(sys::SignalHandler IF) {
   InterruptFunction.exchange(IF);
   RegisterHandlers();
 }
 
-void llvm::sys::SetInfoSignalFunction(void (*Handler)()) {
+void llvm::sys::SetInfoSignalFunction(sys::SignalHandler Handler) {
   InfoSignalFunction.exchange(Handler);
   RegisterHandlers();
 }
 
-void llvm::sys::SetOneShotPipeSignalFunction(void (*Handler)()) {
+void llvm::sys::SetOneShotPipeSignalFunction(sys::SignalHandler Handler) {
   OneShotPipeSignalFunction.exchange(Handler);
   RegisterHandlers();
 }

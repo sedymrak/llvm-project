@@ -15,6 +15,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/Signals.h"
 #include "llvm/Support/WindowsError.h"
 #include <io.h>
 #include <signal.h>
@@ -524,17 +525,17 @@ void llvm::sys::PrintStackTrace(raw_ostream &OS, int Depth) {
   LocalPrintStackTrace(OS, nullptr);
 }
 
-void llvm::sys::SetInterruptFunction(void (*IF)()) {
+void llvm::sys::SetInterruptFunction(sys::SignalHandler IF) {
   RegisterHandler();
   InterruptFunction = IF;
   LeaveCriticalSection(&CriticalSection);
 }
 
-void llvm::sys::SetInfoSignalFunction(void (*Handler)()) {
+void llvm::sys::SetInfoSignalFunction(sys::SignalHandler Handler) {
   // Unimplemented.
 }
 
-void llvm::sys::SetOneShotPipeSignalFunction(void (*Handler)()) {
+void llvm::sys::SetOneShotPipeSignalFunction(sys::SignalHandler Handler) {
   OneShotPipeSignalFunction.exchange(Handler);
 }
 
