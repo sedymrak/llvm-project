@@ -248,6 +248,24 @@ llvm::ErrorOr<std::vector<HANDLE>> ProcessLauncherWindows::GetInheritedHandles(
 
   if (inherited_handles.empty())
     return inherited_handles;
+  // ==== CODASIP ====
+  // !!! Drop this Codasip patch during the bump to LLVM 23 where this problem was already fixed:
+  // !!! https://github.com/llvm/llvm-project/blob/e59fe34ea2e931dfeb39e9facd0442ca96dfdc6d/lldb/source/Host/windows/ProcessLauncherWindows.cpp#L294-L302
+  //
+  // Here we remove all duplicate handles from the list of inherited handles.
+  // This prevents the ::CreateProcessW call from failing with
+  // ERROR_INVALID_PARAMETER (i.e. "The parameter is incorrect").
+  //
+  // This bug can be reproduced in the MSYS2 environment where ::GetStdHandle
+  // maps STDOUT and STDERR are the same handle.
+  //
+  // This bug cannot be reproduced when LLDB is run on cmd.exe console
+  // because there ::GetStdHandle maps STDOUT and STDERR to different handles.
+  std::sort(inherited_handles.begin(), inherited_handles.end());
+  inherited_handles.erase(
+      std::unique(inherited_handles.begin(), inherited_handles.end()),
+      inherited_handles.end());
+  // =================
 
   if (!UpdateProcThreadAttribute(
           startupinfoex.lpAttributeList, /*dwFlags=*/0,
