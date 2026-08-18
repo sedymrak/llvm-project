@@ -436,6 +436,16 @@ protected:
   bool m_color;
   bool m_interrupt_exits;
   std::string m_line_buffer;
+#ifdef _WIN32
+  /// True while the interactive prompt is visible on the terminal and the
+  /// IOHandler is blocked waiting for user input.  Read and written only while
+  /// holding m_output_sp's lock so that PrintAsync can test it atomically.
+  bool m_prompt_is_showing = false;
+  /// True after the first async output chunk has been written to the terminal
+  /// while the prompt was visible, and before the output ends with a newline.
+  /// Prevents each subsequent chunk from re-backing up over the prompt.
+  bool m_output_in_progress = false;
+#endif
 };
 
 // The order of base classes is important. Look at the constructor of

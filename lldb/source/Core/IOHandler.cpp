@@ -360,6 +360,9 @@ bool IOHandlerEditline::GetLine(std::string &line, bool &interrupted) {
       if (m_output_sp) {
         LockedStreamFile locked_stream = m_output_sp->Lock();
         locked_stream.PutCString(prompt);
+#ifdef _WIN32
+        m_prompt_is_showing = true;
+#endif
       }
     }
   }
@@ -369,6 +372,13 @@ bool IOHandlerEditline::GetLine(std::string &line, bool &interrupted) {
   if (!got_line && !m_input_sp) {
     // No more input file, we are done...
     SetIsDone(true);
+#ifdef _WIN32
+    if (m_output_sp) {
+      LockedStreamFile locked_stream = m_output_sp->Lock();
+      m_prompt_is_showing = false;
+      m_output_in_progress = false;
+    }
+#endif
     return false;
   }
 
@@ -424,6 +434,13 @@ bool IOHandlerEditline::GetLine(std::string &line, bool &interrupted) {
     line = *got_line;
   }
 
+#ifdef _WIN32
+  if (m_output_sp) {
+    LockedStreamFile locked_stream = m_output_sp->Lock();
+    m_prompt_is_showing = false;
+    m_output_in_progress = false;
+  }
+#endif
   return (bool)got_line;
 }
 
@@ -663,25 +680,42 @@ void IOHandlerEditline::PrintAsync(const char *s, size_t len, bool is_stdout) {
   } else
 #endif
   {
+    lldb::LockableStreamFileSP stream_sp = is_stdout ? m_output_sp : m_error_sp;
+    LockedStreamFile locked_stream = stream_sp->Lock();
 #ifdef _WIN32
-    const char *prompt = GetPrompt();
-    if (prompt) {
-      // Back up over previous prompt using Windows API
-      CONSOLE_SCREEN_BUFFER_INFO screen_buffer_info;
-      HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-      GetConsoleScreenBufferInfo(console_handle, &screen_buffer_info);
-      COORD coord = screen_buffer_info.dwCursorPosition;
-      coord.X -= strlen(prompt);
-      if (coord.X < 0)
-        coord.X = 0;
-      SetConsoleCursorPosition(console_handle, coord);
+    if (is_stdout && m_prompt_is_showing) {
+      if (!m_output_in_progress) {
+        // First chunk of async output while the prompt is showing: back up the
+        // cursor to the start of the prompt line so the output overwrites it.
+        // All Console API calls and stream writes share the same lock so no
+        // other thread can move the cursor between these operations.
+        CONSOLE_SCREEN_BUFFER_INFO screen_buffer_info;
+        HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        GetConsoleScreenBufferInfo(console_handle, &screen_buffer_info);
+        COORD coord = screen_buffer_info.dwCursorPosition;
+        coord.X -= strlen(GetPrompt());
+        if (coord.X < 0)
+          coord.X = 0;
+        SetConsoleCursorPosition(console_handle, coord);
+        m_output_in_progress = true;
+      }
+      // Subsequent chunks continue writing from wherever the previous chunk
+      // left the cursor — do not move the cursor again.
+      locked_stream.Write(s, len);
+      // Re-display the prompt only after a complete output line has arrived.
+      // A chunk ending in \r (but not \n) must not trigger a re-print because
+      // \r moves the cursor back to column 0 of the current line, and writing
+      // the prompt there would overwrite the beginning of the output.
+      if (len > 0 && static_cast<const char *>(s)[len - 1] == '\n') {
+        m_output_in_progress = false;
+        const char *prompt = GetPrompt();
+        locked_stream.Write(prompt, strlen(prompt));
+      }
+    } else
+#endif
+    {
+      locked_stream.Write(s, len);
     }
-#endif
-    IOHandler::PrintAsync(s, len, is_stdout);
-#ifdef _WIN32
-    if (prompt)
-      IOHandler::PrintAsync(prompt, strlen(prompt), is_stdout);
-#endif
   }
 }
 
