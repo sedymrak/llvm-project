@@ -118,6 +118,13 @@ private:
   std::map<lldb::break_id_t, WatchpointInfo> m_watchpoints;
   std::vector<lldb::break_id_t> m_watchpoint_ids;
   std::shared_ptr<PTY> m_pty;
+  bool m_conpty_sequences_stripped = false;
+  // True when the previous chunk ended with \r that was converted to \n;
+  // the next chunk's leading \n (orphaned LF) must be discarded.
+  bool m_conpty_pending_cr = false;
+
+  static void ConPTYSTDIOReadThreadBytesReceived(void *baton, const void *src,
+                                                 size_t src_len);
 };
 } // namespace lldb_private
 

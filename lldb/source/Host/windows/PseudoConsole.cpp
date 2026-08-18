@@ -8,6 +8,7 @@
 
 #include "lldb/Host/windows/PseudoConsole.h"
 
+#include <cstdio>
 #include <mutex>
 
 #include "lldb/Host/windows/PipeWindows.h"
@@ -24,6 +25,8 @@ typedef HRESULT(WINAPI *CreatePseudoConsole_t)(COORD size, HANDLE hInput,
                                                HPCON *phPC);
 
 typedef VOID(WINAPI *ClosePseudoConsole_t)(HPCON hPC);
+
+static constexpr DWORD PSEUDOCONSOLE_INHERIT_CURSOR = 0x1;
 
 struct Kernel32 {
   Kernel32() {
@@ -90,10 +93,24 @@ llvm::Error PseudoConsole::OpenPseudoConsole() {
     return llvm::errorCodeToError(
         std::error_code(GetLastError(), std::system_category()));
 
+  // Default cursor position: last row so ConPTY won't scroll back over
+  // existing output if we can't query the real console.
   COORD consoleSize{80, 25};
+  int cursorRow = consoleSize.Y;
+  int cursorCol = 1;
+  CONSOLE_SCREEN_BUFFER_INFO csbi;
+  if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
+    consoleSize = {
+        static_cast<SHORT>(csbi.srWindow.Right - csbi.srWindow.Left + 1),
+        static_cast<SHORT>(csbi.srWindow.Bottom - csbi.srWindow.Top + 1)};
+    cursorRow = csbi.dwCursorPosition.Y - csbi.srWindow.Top + 1;
+    cursorCol = csbi.dwCursorPosition.X + 1;
+  }
   HPCON hPC = INVALID_HANDLE_VALUE;
-  hr = kernel32.CreatePseudoConsole(consoleSize, hInputRead, hOutputWrite, 0,
-                                    &hPC);
+  // PSEUDOCONSOLE_INHERIT_CURSOR prevents ConPTY from emitting screen-clear
+  // sequences when the first process attaches.
+  hr = kernel32.CreatePseudoConsole(consoleSize, hInputRead, hOutputWrite,
+                                    PSEUDOCONSOLE_INHERIT_CURSOR, &hPC);
   CloseHandle(hInputRead);
   CloseHandle(hOutputWrite);
 
@@ -111,6 +128,18 @@ llvm::Error PseudoConsole::OpenPseudoConsole() {
   m_conpty_handle = hPC;
   m_conpty_output = hOutputRead;
   m_conpty_input = hInputWrite;
+
+  // PSEUDOCONSOLE_INHERIT_CURSOR causes ConPTY to emit \x1b[6n on the output
+  // pipe to query the cursor position before finishing init. Write the
+  // response so ConPTY can complete initialization without clearing the screen.
+  char response[32];
+  int rlen =
+      snprintf(response, sizeof(response), "\x1b[%d;%dR", cursorRow, cursorCol);
+  if (rlen > 0) {
+    DWORD nwritten = 0;
+    WriteFile(m_conpty_input, response, static_cast<DWORD>(rlen), &nwritten,
+              NULL);
+  }
 
   return llvm::Error::success();
 }

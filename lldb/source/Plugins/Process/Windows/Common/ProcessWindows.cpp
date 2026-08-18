@@ -10,6 +10,7 @@
 
 // Windows includes
 #include "lldb/Host/windows/windows.h"
+#include <cstring>
 #include <psapi.h>
 
 #include "lldb/Breakpoint/Watchpoint.h"
@@ -734,9 +735,41 @@ ProcessWindows::OnDebugException(bool first_chance,
     return ExceptionResult::SendToApplication;
   }
 
+  // Drain any in-flight process output before announcing the stop. The I/O
+  // reader thread and this debug-event thread run concurrently. Without
+  // synchronization the eBroadcastBitStateChanged(Stopped) event can reach
+  // the Debugger event thread before the preceding eBroadcastBitSTDOUT
+  // events.
+  auto drain_stdout = [this] {
+    if (!m_stdio_communication.ReadThreadIsRunning())
+      return;
+    m_stdio_communication.SynchronizeWithReadThread();
+    if (!m_pty)
+      return;
+
+    HANDLE pipe = m_pty->GetSTDOUTHandle();
+    for (int consec_empty = 0; consec_empty < 3;) {
+      if (!m_stdio_communication.ReadThreadIsRunning())
+        break;
+      DWORD avail = 0;
+      // PeekNamedPipe is thread safe.
+      if (!::PeekNamedPipe(pipe, nullptr, 0, nullptr, &avail, nullptr))
+        break;
+      if (avail > 0) {
+        consec_empty = 0;
+        m_stdio_communication.SynchronizeWithReadThread();
+      } else {
+        ++consec_empty;
+        if (consec_empty < 3)
+          ::SleepEx(5, FALSE);
+      }
+    }
+  };
+
   if (!first_chance) {
     // Not any second chance exception is an application crash by definition.
     // It may be an expression evaluation crash.
+    drain_stdout();
     SetPrivateState(eStateStopped);
   }
 
@@ -757,10 +790,12 @@ ProcessWindows::OnDebugException(bool first_chance,
       LLDB_LOG(log, "Hit non-loader breakpoint at address {0:x}.",
                record.GetExceptionAddress());
     }
+    drain_stdout();
     SetPrivateState(eStateStopped);
     break;
   case EXCEPTION_SINGLE_STEP:
     result = ExceptionResult::BreakInDebugger;
+    drain_stdout();
     SetPrivateState(eStateStopped);
     break;
   default:
@@ -958,11 +993,14 @@ public:
                   IOHandler::Type::ProcessIO),
         m_process(process),
         m_read_file(GetInputFD(), File::eOpenOptionReadOnly, false),
-        m_write_file(conpty_input) {
-    m_pipe.CreateNew();
-  }
+        m_write_file(conpty_input),
+        // Auto-reset event: WaitForMultipleObjects resets it after pick-up.
+        m_event(::CreateEvent(nullptr, FALSE, FALSE, nullptr)) {}
 
-  ~IOHandlerProcessSTDIOWindows() override = default;
+  ~IOHandlerProcessSTDIOWindows() override {
+    if (m_event != INVALID_HANDLE_VALUE)
+      ::CloseHandle(m_event);
+  }
 
   void SetIsRunning(bool running) {
     std::lock_guard<std::mutex> guard(m_mutex);
@@ -972,7 +1010,7 @@ public:
 
   void Run() override {
     if (!m_read_file.IsValid() || m_write_file == INVALID_HANDLE_VALUE ||
-        !m_pipe.CanRead() || !m_pipe.CanWrite()) {
+        m_event == INVALID_HANDLE_VALUE) {
       SetIsDone(true);
       return;
     }
@@ -981,8 +1019,7 @@ public:
     SetIsRunning(true);
 
     HANDLE hStdin = (HANDLE)_get_osfhandle(m_read_file.GetDescriptor());
-    HANDLE hInterrupt = (HANDLE)_get_osfhandle(m_pipe.GetReadFileDescriptor());
-    HANDLE waitHandles[2] = {hStdin, hInterrupt};
+    HANDLE waitHandles[2] = {hStdin, m_event};
 
     while (true) {
       {
@@ -1007,15 +1044,15 @@ public:
         break;
       }
       case WAIT_OBJECT_0 + 1: {
-        char ch = 0;
-        DWORD read = 0;
-        if (!ReadFile(hInterrupt, &ch, 1, &read, nullptr) || read != 1)
+        // Auto-reset event was consumed; check whether it was a quit or Ctrl+C.
+        bool quit;
+        {
+          std::lock_guard<std::mutex> guard(m_mutex);
+          quit = m_quit_requested;
+        }
+        if (quit)
           goto exit_loop;
-
-        if (ch == eControlOpQuit)
-          goto exit_loop;
-        if (ch == eControlOpInterrupt &&
-            StateIsRunningState(m_process->GetState()))
+        if (StateIsRunningState(m_process->GetState()))
           m_process->SendAsyncInterrupt();
         break;
       }
@@ -1031,19 +1068,16 @@ public:
   void Cancel() override {
     std::lock_guard<std::mutex> guard(m_mutex);
     SetIsDone(true);
-    if (m_is_running) {
-      char ch = eControlOpQuit;
-      if (llvm::Error err = m_pipe.Write(&ch, 1).takeError()) {
-        LLDB_LOG_ERROR(GetLog(LLDBLog::Process), std::move(err),
-                       "Pipe write failed: {0}");
-      }
-    }
+    m_quit_requested = true;
+    if (m_event != INVALID_HANDLE_VALUE)
+      ::SetEvent(m_event);
   }
 
   bool Interrupt() override {
     if (m_active) {
-      char ch = eControlOpInterrupt;
-      return !errorToBool(m_pipe.Write(&ch, 1).takeError());
+      if (m_event != INVALID_HANDLE_VALUE)
+        ::SetEvent(m_event); // wakes Run(); quit flag is false so it sends SIGINT
+      return true;
     }
     if (StateIsRunningState(m_process->GetState())) {
       m_process->SendAsyncInterrupt();
@@ -1056,36 +1090,110 @@ public:
 
 private:
   Process *m_process;
-  NativeFile m_read_file; // Read from this file (usually actual STDIN for LLDB
-  HANDLE m_write_file =
-      INVALID_HANDLE_VALUE; // Write to this file (usually the primary pty for
-                            // getting io to debuggee)
-  Pipe m_pipe;
+  NativeFile m_read_file;
+  HANDLE m_write_file = INVALID_HANDLE_VALUE;
+  HANDLE m_event = INVALID_HANDLE_VALUE;
   std::mutex m_mutex;
   bool m_is_running = false;
-
-  enum ControlOp : char {
-    eControlOpQuit = 'q',
-    eControlOpInterrupt = 'i',
-  };
+  bool m_quit_requested = false; // set by Cancel(), checked when event fires
 };
 
 void ProcessWindows::SetPseudoConsoleHandle(
     const std::shared_ptr<PseudoConsole> &pty) {
+  m_conpty_sequences_stripped = false;
+  m_conpty_pending_cr = false;
   m_stdio_communication.SetConnection(
       std::make_unique<ConnectionGenericFile>(pty->GetSTDOUTHandle(), false));
   if (m_stdio_communication.IsConnected()) {
     m_stdio_communication.SetReadThreadBytesReceivedCallback(
-        STDIOReadThreadBytesReceived, this);
+        ConPTYSTDIOReadThreadBytesReceived, this);
     m_stdio_communication.StartReadThread();
 
-    // Now read thread is set up, set up input reader.
+    // Create a fresh handler for each launch so flags are in a clean state.
     {
       std::lock_guard<std::mutex> guard(m_process_input_reader_mutex);
-      if (!m_process_input_reader)
-        m_process_input_reader = std::make_shared<IOHandlerProcessSTDIOWindows>(
-            this, pty->GetSTDINHandle());
+      m_process_input_reader = std::make_shared<IOHandlerProcessSTDIOWindows>(
+          this, pty->GetSTDINHandle());
     }
   }
+}
+
+// Strips ConPTY-injected VT sequences that must not reach the outer terminal.
+// strip_init removes sequences only present on the first read chunk.
+static void StripConPTYSequences(char *buf, size_t &len, bool strip_init) {
+  char *out = buf;
+  const char *in = buf;
+  const char *end = buf + len;
+  while (in < end) {
+    // ConPTY uses CRLF (\r\n) line endings; strip \r so Unix terminals see \n.
+    if (*in == '\r') { in++; continue; }
+    if (*in != '\x1b') {
+      *out++ = *in++;
+      continue;
+    }
+    size_t rem = static_cast<size_t>(end - in);
+    // \x1b[6n - cursor-position query (PSEUDOCONSOLE_INHERIT_CURSOR init)
+    if (rem >= 4 && memcmp(in, "\x1b[6n", 4) == 0) { in += 4; continue; }
+    if (strip_init) {
+      if (rem >= 3 && memcmp(in, "\x1b[m", 3) == 0) { in += 3; continue; }
+      if (rem >= 6 && memcmp(in, "\x1b[?25h", 6) == 0) { in += 6; continue; }
+    }
+    // \x1b[?9001h/l - Win32 Input Mode (corrupts outer terminal if forwarded)
+    if (rem >= 8 && memcmp(in, "\x1b[?9001", 7) == 0 &&
+        (in[7] == 'h' || in[7] == 'l')) { in += 8; continue; }
+    // \x1b[?1004h/l - focus-event reporting
+    if (rem >= 8 && memcmp(in, "\x1b[?1004", 7) == 0 &&
+        (in[7] == 'h' || in[7] == 'l')) { in += 8; continue; }
+    // \x1b]0;...\x07 - ConPTY window-title OSC
+    if (rem >= 4 && in[1] == ']' && in[2] == '0' && in[3] == ';') {
+      const char *bel =
+          static_cast<const char *>(memchr(in + 4, '\x07', end - in - 4));
+      in = bel ? bel + 1 : end;
+      continue;
+    }
+    *out++ = *in++;
+  }
+  len = static_cast<size_t>(out - buf);
+}
+
+void ProcessWindows::ConPTYSTDIOReadThreadBytesReceived(void *baton,
+                                                        const void *src,
+                                                        size_t src_len) {
+  if (src_len == 0)
+    return;
+  auto *process = static_cast<ProcessWindows *>(baton);
+  const char *data = static_cast<const char *>(src);
+  size_t len = src_len;
+
+  // Discard the orphaned \n when the previous chunk's trailing \r was already
+  // converted to \n to handle CRLF split across pipe reads.
+  if (process->m_conpty_pending_cr) {
+    process->m_conpty_pending_cr = false;
+    if (len > 0 && data[0] == '\n') {
+      ++data;
+      if (--len == 0)
+        return;
+    }
+  }
+
+  // Check before stripping whether the original chunk ends with \r.
+  const bool ends_with_cr = (len > 0 && data[len - 1] == '\r');
+
+  std::vector<char> buf(data, data + len);
+  size_t new_len = len;
+  StripConPTYSequences(buf.data(), new_len,
+                       !process->m_conpty_sequences_stripped);
+  process->m_conpty_sequences_stripped = true;
+
+  // When a chunk ends with \r (CRLF split across reads), synthesize \n
+  // immediately so the line is complete even if the matching \n arrives after
+  // the stop event is already broadcast.
+  if (ends_with_cr && new_len > 0) {
+    buf[new_len++] = '\n'; // slot is safe: \r was stripped, new_len < len
+    process->m_conpty_pending_cr = true;
+  }
+
+  if (new_len > 0)
+    process->AppendSTDOUT(buf.data(), new_len);
 }
 } // namespace lldb_private
