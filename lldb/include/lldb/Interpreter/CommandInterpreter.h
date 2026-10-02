@@ -772,7 +772,7 @@ private:
   // Execution contexts that were temporarily set by some of HandleCommand*
   // overloads.
   std::stack<ExecutionContext> m_overriden_exe_contexts;
-  bool m_synchronous_execution;
+  bool m_synchronous_execution; // This value can be set by the `lldb::SBDebugger::SetAsync(bool)` API method.
   bool m_skip_lldbinit_files;
   bool m_skip_app_init_files;
   CommandObject::CommandMap m_command_dict; // Stores basic built-in commands
