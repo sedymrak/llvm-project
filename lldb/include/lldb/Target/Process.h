@@ -3092,6 +3092,7 @@ protected:
   /// \return
   ///     An Status object describing the success or failure of the resume.
   Status PrivateResume();
+  // This method is reused by both, `Resume` as well as by `ResumeSynchronous` method.
 
   // Called internally
   void CompleteAttach();
