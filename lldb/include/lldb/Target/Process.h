@@ -867,6 +867,7 @@ public:
   /// \see Thread:Step()
   /// \see Thread:Suspend()
   Status Resume();
+  // Like `ResumeSynchronous`, but does not wait for the process to stop.
 
   /// Resume a process, and wait for it to stop.
   Status ResumeSynchronous(Stream *stream);
